@@ -1,0 +1,15 @@
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+# local test artefacts and generated crawl data
+shots/
+dist/
+tools/__pycache__/
+tools/valid.json
+tools/publishers.json
+tools/flipboard_topics.json
