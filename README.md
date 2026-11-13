@@ -120,7 +120,11 @@
 
 ---
 
-### 🆕 New in 1.1
+### 🆕 New in 1.2
+- **Sections** – filter the whole feed (and the briefing) to one topic from the side panel
+- **Reading time** on every article; Settings sheet now scrolls so Updates is always reachable
+
+### New in 1.1
 - **Daily briefing cover** – a Flipboard-style "Good morning" first page with the top 5 stories from different publishers
 - **Magazines** – save stories with the star, or file them into your own collections
 - **Mute publishers**, **share** stories, new adaptive + themed icon

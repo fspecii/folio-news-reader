@@ -3,6 +3,7 @@ package dev.folio.news.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -134,5 +135,27 @@ private fun NameDialog(title: String, onDone: (String) -> Unit, onCancel: () -> 
         text = { OutlinedTextField(text, { text = it }, singleLine = true, placeholder = { Text("e.g. Long reads") }) },
         confirmButton = { TextButton(onClick = { if (text.isNotBlank()) onDone(text) }) { Text("Create") } },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
+    )
+}
+
+/** Filter the home feed to one of your topics (like Flipboard's sections). */
+@Composable
+fun SectionsDialog(vm: AppViewModel) {
+    AlertDialog(
+        onDismissRequest = { vm.showSections = false },
+        title = { Text("Sections") },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                @Composable fun row(label: String, count: Int, on: Boolean, click: () -> Unit) {
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = click).padding(vertical = 12.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(label, Modifier.weight(1f), fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        Text("$count", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                row("All stories", vm.articles.size, vm.section == null) { vm.selectSection(null) }
+                vm.sectionCounts().forEach { (t, n) -> row(t.title, n, vm.section == t.id) { vm.selectSection(t.id) } }
+            }
+        },
+        confirmButton = { TextButton(onClick = { vm.showSections = false }) { Text("Close") } },
     )
 }

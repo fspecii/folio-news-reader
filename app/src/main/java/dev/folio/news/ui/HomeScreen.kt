@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -57,7 +58,7 @@ fun HomeScreen(vm: AppViewModel) {
             onDragStopped = { if (acc > 70f) panelOpen = true else if (acc < -70f) panelOpen = false },
         )
     ) {
-        val list = vm.articles
+        val list = vm.feed
         if (list.isEmpty()) {
             Column(
                 Modifier.fillMaxSize().padding(40.dp), verticalArrangement = Arrangement.Center,
@@ -89,7 +90,7 @@ fun HomeScreen(vm: AppViewModel) {
                     } else list.getOrNull(p - 1)?.let { a -> vm.open(a) }
                 },
                 modifier = Modifier.fillMaxSize(),
-            ) { p -> if (p == 0) BriefingPage(brief) else StoryPage(list[p - 1], p - 1) }
+            ) { p -> if (p == 0) BriefingPage(brief, vm.section?.let { id -> dev.folio.news.data.Catalog.topics.firstOrNull { it.id == id }?.title }) else StoryPage(list[p - 1], p - 1) }
         }
 
         // legibility scrim so system icons stay readable over any photo
@@ -130,6 +131,7 @@ private fun SidePanel(vm: AppViewModel, open: Boolean, setOpen: (Boolean) -> Uni
                 }
                 Spacer(Modifier.height(28.dp))
                 PanelItem(Icons.Default.Refresh, if (vm.loading) "Refreshing\u2026" else "Refresh") { vm.refresh(); setOpen(false) }
+                PanelItem(Icons.Default.Menu, "Sections") { setOpen(false); vm.showSections = true }
                 PanelItem(Icons.Default.Favorite, "Magazines") { setOpen(false); vm.showMagazines = true }
                 PanelItem(Icons.AutoMirrored.Filled.List, "Sources") { setOpen(false); vm.showSources = true }
                 PanelItem(Icons.Default.Star, "Interests") { setOpen(false); vm.showWizard = true }
@@ -274,7 +276,7 @@ private const val BRIEF_WEIGHT = 6.1f   // header weight + five rows
 
 /** Flipboard-style "daily edition" cover: date, greeting and the top stories from different publishers. */
 @Composable
-fun BriefingPage(items: List<Article>) {
+fun BriefingPage(items: List<Article>, section: String? = null) {
     val onBg = MaterialTheme.colorScheme.onBackground
     val sub = MaterialTheme.colorScheme.onSurfaceVariant
     val accent = MaterialTheme.colorScheme.primary
@@ -286,7 +288,7 @@ fun BriefingPage(items: List<Article>) {
             Text(date.uppercase(), color = accent, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.6.sp)
             Spacer(Modifier.height(6.dp))
             Text(hello, color = onBg, fontFamily = Serif, fontWeight = FontWeight.Black, fontSize = 40.sp)
-            Text("Your briefing", color = sub, fontSize = 15.sp)
+            Text(if (section == null) "Your briefing" else "Your briefing \u00b7 $section", color = sub, fontSize = 15.sp)
             Spacer(Modifier.height(10.dp))
         }
         for (i in 0 until 5) {

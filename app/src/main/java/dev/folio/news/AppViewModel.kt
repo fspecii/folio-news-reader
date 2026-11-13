@@ -42,6 +42,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var smartFeed by mutableStateOf(prefs.smartFeed); private set
     var onboarded by mutableStateOf(prefs.onboarded); private set
 
+    /** Topic id the home feed is filtered to (null = everything). */
+    var section by mutableStateOf<String?>(null); private set
+    var showSections by mutableStateOf(false)
+    val feed: List<Article> get() = section?.let { sec -> articles.filter { topicOf(it.sourceId) == sec } } ?: articles
+    fun sectionCounts(): List<Pair<Topic, Int>> =
+        Catalog.topics.map { t -> t to articles.count { topicOf(it.sourceId) == t.id } }.filter { it.second > 0 }.sortedByDescending { it.second }
+    fun selectSection(id: String?) { section = id; homeIndex = -1; showSections = false; lastShown = -1 }
+
     var homeIndex by mutableIntStateOf(-1)   // -1 = the daily briefing cover
     var openArticle by mutableStateOf<Article?>(null)
     var showSources by mutableStateOf(false)
@@ -149,7 +157,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The cover page: the best few stories from different publishers. */
     fun briefing(): List<Article> {
         val seen = HashSet<String>()
-        return articles.filter { seen.add(it.sourceName) }.take(5)
+        return feed.filter { seen.add(it.sourceName) }.take(5)
     }
 
     // ------------------------------------------------------------------ feed
@@ -214,8 +222,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The home pager settled on [idx]: if the previous story was flicked past quickly, count it as a skip. */
     fun onHomePage(idx: Int) {
         val now = System.currentTimeMillis()
-        if (lastShown in articles.indices && lastShown != idx && !lastOpened && now - lastShownAt < 1600) {
-            val a = articles[lastShown]; Ranker.learnSkip(profile, a, topicOf(a.sourceId))
+        if (lastShown in feed.indices && lastShown != idx && !lastOpened && now - lastShownAt < 1600) {
+            val a = feed[lastShown]; Ranker.learnSkip(profile, a, topicOf(a.sourceId))
         }
         lastShown = idx; lastShownAt = now; lastOpened = false
     }
@@ -320,13 +328,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun cachedBlocks(a: Article): List<Block>? = blockCache[a.id]
 
     fun nextOf(a: Article): Article? {
-        val i = articles.indexOfFirst { it.id == a.id }
-        return if (i >= 0) articles.getOrNull(i + 1) else null
+        val f = feed
+        val i = f.indexOfFirst { it.id == a.id }
+        return if (i >= 0) f.getOrNull(i + 1) else null
     }
 
     /** Continue straight into the following story (keeps the home flip position in sync). */
     fun advanceTo(next: Article) {
-        val i = articles.indexOfFirst { it.id == next.id }
+        val i = feed.indexOfFirst { it.id == next.id }
         if (i >= 0) homeIndex = i
         continued = true
         lastShown = i; lastShownAt = System.currentTimeMillis(); lastOpened = true
@@ -347,7 +356,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         val full = buildList {
             add(Block.Text(TextKind.Title, a.title))
-            add(Block.Text(TextKind.Byline, bylineOf(a)))
+            val mins = (Extractor.textLength(body) / 1100).coerceAtLeast(1)
+            add(Block.Text(TextKind.Byline, bylineOf(a) + if (Extractor.textLength(body) > 600) "  ·  $mins min read" else ""))
             if (body.firstOrNull() !is Block.Image && a.image != null) add(Block.Image(a.image))
             addAll(body.dropWhile { it is Block.Text && it.text.trim().equals(a.title.trim(), true) })
             if (a.link.startsWith("http")) {

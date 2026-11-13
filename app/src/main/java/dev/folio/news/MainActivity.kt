@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
                         exit = slideOutHorizontally(tween(220)) { it } + fadeOut(),
                     ) { MagazinesScreen(vm) }
 
+                    if (vm.showSections) SectionsDialog(vm)
                     vm.saveTarget?.let { SaveToMagazineDialog(vm, it) }
                     UpdateDialog(vm)
                     LaunchedEffect(vm.onboarded) { if (vm.onboarded) vm.checkForUpdate() }
