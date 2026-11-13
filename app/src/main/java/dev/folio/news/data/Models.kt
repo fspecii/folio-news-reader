@@ -15,6 +15,9 @@ data class Article(
     val rank: Int = 0,
 )
 
+/** A user collection of saved stories (Flipboard "magazine"). */
+data class Magazine(val id: String, val name: String, val articles: List<Article> = emptyList())
+
 enum class ThemeMode { System, Light, Dark }
 
 enum class TextKind { Title, Byline, Heading, Para, Quote, Bullet }

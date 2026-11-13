@@ -42,7 +42,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var smartFeed by mutableStateOf(prefs.smartFeed); private set
     var onboarded by mutableStateOf(prefs.onboarded); private set
 
-    var homeIndex by mutableIntStateOf(0)
+    var homeIndex by mutableIntStateOf(-1)   // -1 = the daily briefing cover
     var openArticle by mutableStateOf<Article?>(null)
     var showSources by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
@@ -53,7 +53,104 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val blockCache = HashMap<String, List<Block>>()
     private var sourcesDirty = false
 
-    init { if (prefs.onboarded) refresh() }
+
+    // ------------------------------------------------------------ magazines (saved stories)
+
+    var magazines by mutableStateOf(loadMags()); private set
+    var showMagazines by mutableStateOf(false)
+    var saveTarget by mutableStateOf<Article?>(null)   // story waiting for a magazine to be picked
+
+    private fun loadMags(): List<Magazine> = prefs.loadMagazines().ifEmpty { listOf(Magazine("later", "Read later")) }
+    private fun putMags(l: List<Magazine>) { magazines = l; prefs.saveMagazines(l) }
+
+    fun isSaved(a: Article) = magazines.any { m -> m.articles.any { it.id == a.id } }
+    fun savedIn(a: Article, m: Magazine) = m.articles.any { it.id == a.id }
+
+    /** Adds or removes the story; the body is stored too so saved stories read offline. */
+    fun toggleSave(a: Article, mag: Magazine) {
+        val full = a.copy(contentHtml = a.contentHtml ?: cachedBodyHtml(a))
+        putMags(magazines.map {
+            if (it.id != mag.id) it
+            else if (savedIn(a, it)) it.copy(articles = it.articles.filterNot { x -> x.id == a.id })
+            else it.copy(articles = listOf(full) + it.articles)
+        })
+    }
+    fun quickSave(a: Article) {
+        val first = magazines.first()
+        if (isSaved(a)) putMags(magazines.map { it.copy(articles = it.articles.filterNot { x -> x.id == a.id }) }) else toggleSave(a, first)
+    }
+    fun newMagazine(name: String, forArticle: Article? = null) {
+        val m = Magazine(UUID.randomUUID().toString(), name.trim().ifBlank { "Untitled" })
+        putMags(magazines + m)
+        if (forArticle != null) toggleSave(forArticle, m)
+    }
+    fun deleteMagazine(id: String) { if (id != "later") putMags(magazines.filterNot { it.id == id }) }
+
+    private fun cachedBodyHtml(a: Article): String? = null
+
+    // ------------------------------------------------------------ muting
+
+    var muted by mutableStateOf(prefs.muted); private set
+    fun mute(publisher: String) {
+        muted = muted + publisher; prefs.muted = muted
+        articles = articles.filterNot { it.sourceName == publisher }
+        if (homeIndex >= articles.size) homeIndex = articles.size - 1
+        prefs.saveArticles(articles)
+    }
+    fun unmute(publisher: String) { muted = muted - publisher; prefs.muted = muted }
+
+    // ------------------------------------------------------------ updates
+
+    sealed interface UpdateState {
+        data object Idle : UpdateState
+        data object Checking : UpdateState
+        data object UpToDate : UpdateState
+        data class Available(val info: UpdateInfo) : UpdateState
+        data class Downloading(val info: UpdateInfo, val progress: Float) : UpdateState
+        data class Failed(val message: String) : UpdateState
+    }
+    var update by mutableStateOf<UpdateState>(UpdateState.Idle); private set
+    var autoUpdate by mutableStateOf(prefs.autoUpdate); private set
+    var updateDismissed by mutableStateOf(false)
+    val versionName: String = runCatching { app.packageManager.getPackageInfo(app.packageName, 0).versionName }.getOrNull() ?: "0"
+
+    fun updateAuto(v: Boolean) { autoUpdate = v; prefs.autoUpdate = v }
+
+    /** On launch: at most every 6 hours. Manual checks always run. */
+    fun checkForUpdate(manual: Boolean = false) {
+        if (update is UpdateState.Checking || update is UpdateState.Downloading) return
+        if (!manual && (!prefs.autoUpdate || System.currentTimeMillis() - prefs.lastUpdateCheck < 6 * 3600_000L)) return
+        update = UpdateState.Checking; updateDismissed = false
+        viewModelScope.launch {
+            update = withContext(Dispatchers.IO) {
+                runCatching { Updater.check(client, versionName) }.fold(
+                    { prefs.lastUpdateCheck = System.currentTimeMillis(); if (it != null) UpdateState.Available(it) else UpdateState.UpToDate },
+                    { if (manual) UpdateState.Failed(it.message ?: "Couldn't reach GitHub") else UpdateState.Idle },
+                )
+            }
+        }
+    }
+
+    fun installUpdate(info: UpdateInfo) {
+        val ctx = getApplication<Application>()
+        if (!Updater.canInstall(ctx)) { Updater.askPermission(ctx); return }
+        update = UpdateState.Downloading(info, 0f)
+        viewModelScope.launch {
+            val r = withContext(Dispatchers.IO) {
+                runCatching { Updater.download(client, ctx, info) { p -> update = UpdateState.Downloading(info, p) } }
+            }
+            r.onSuccess { update = UpdateState.Available(info); Updater.install(ctx, it) }
+                .onFailure { update = UpdateState.Failed(it.message ?: "Download failed") }
+        }
+    }
+
+    // ------------------------------------------------------------ briefing
+
+    /** The cover page: the best few stories from different publishers. */
+    fun briefing(): List<Article> {
+        val seen = HashSet<String>()
+        return articles.filter { seen.add(it.sourceName) }.take(5)
+    }
 
     // ------------------------------------------------------------------ feed
 
@@ -73,14 +170,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val viaFlipboard = active.filter { it.url.contains("flipboard.com/topic") }.map { it.id }.toSet()
             val perSource = (260 / active.size.coerceAtLeast(1)).coerceIn(6, 20)
             val pooled = dedupe(results.flatMap { it.getOrDefault(emptyList()) }
-                .map { a -> if (a.sourceId in viaFlipboard) a.copy(sourceName = Catalog.publisherName(a.link)) else a })
+                .map { a -> if (a.sourceId in viaFlipboard) a.copy(sourceName = Catalog.publisherName(a.link)) else a }
+                .filter { it.sourceName !in muted })
                 .groupBy { it.sourceId }.values
                 .flatMap { it.sortedByDescending { a -> a.published }.take(perSource) }
                 .map { a -> if (a.image == null) a.copy(image = imageMemo[a.id]) else a }
             when {
                 pooled.isNotEmpty() -> {
                     Ranker.decay(profile)
-                    articles = order(pooled); homeIndex = 0
+                    articles = order(pooled); homeIndex = -1
                     prefs.saveArticles(articles); saveProfile()
                     enrichImages(articles)
                     if (failures > 0 && failures > active.size / 3) error = "$failures sources could not be loaded"
@@ -97,12 +195,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateSmartFeed(v: Boolean) {
         smartFeed = v; prefs.smartFeed = v
-        articles = order(articles); homeIndex = 0
+        articles = order(articles); homeIndex = -1
     }
 
     fun resetLearning() {
         profile.topic.clear(); profile.opens.clear(); profile.skips.clear(); profile.keywords.clear(); profile.read.clear()
-        saveProfile(); articles = order(articles); homeIndex = 0
+        saveProfile(); articles = order(articles); homeIndex = -1
     }
 
     private fun saveProfile() { prefs.profileJson = profile.toJson() }
@@ -265,4 +363,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val date = if (a.published > 0) java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(a.published)) else ""
         return listOf(a.sourceName, date).filter { it.isNotBlank() }.joinToString("  ·  ")
     }
+
+    init { if (prefs.onboarded) refresh() }
 }

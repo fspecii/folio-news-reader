@@ -52,6 +52,47 @@ fun SettingsSheet(vm: AppViewModel) {
             OutlinedButton(onClick = { vm.showSettings = false; vm.showSources = true }, Modifier.fillMaxWidth()) { Text("Browse & manage sources") }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = { vm.showSettings = false; vm.showWizard = true }, Modifier.fillMaxWidth()) { Text("Change my interests") }
+            if (vm.muted.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Text("Muted publishers", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                vm.muted.sorted().forEach { n ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(n, Modifier.weight(1f))
+                        TextButton(onClick = { vm.unmute(n) }) { Text("Unmute") }
+                    }
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            Text("Updates", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Auto-update from GitHub", fontSize = 16.sp)
+                    Text("Checks for a new release when you open Folio", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                }
+                Switch(checked = vm.autoUpdate, onCheckedChange = { vm.updateAuto(it) })
+            }
+            Spacer(Modifier.height(8.dp))
+            val u = vm.update
+            OutlinedButton(
+                onClick = { if (u is AppViewModel.UpdateState.Available) vm.installUpdate(u.info) else vm.checkForUpdate(manual = true) },
+                Modifier.fillMaxWidth(),
+                enabled = u !is AppViewModel.UpdateState.Checking && u !is AppViewModel.UpdateState.Downloading,
+            ) {
+                Text(when (u) {
+                    is AppViewModel.UpdateState.Checking -> "Checking\u2026"
+                    is AppViewModel.UpdateState.Available -> "Install Folio ${u.info.version}"
+                    is AppViewModel.UpdateState.Downloading -> "Downloading ${(u.progress * 100).toInt()}%"
+                    else -> "Check for updates"
+                })
+            }
+            Text(
+                when (u) {
+                    is AppViewModel.UpdateState.UpToDate -> "You're on the latest version (${vm.versionName})."
+                    is AppViewModel.UpdateState.Failed -> u.message
+                    else -> "Version ${vm.versionName}"
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp),
+            )
             TextButton(onClick = { vm.resetLearning() }, Modifier.fillMaxWidth()) { Text("Reset what Folio learned", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }

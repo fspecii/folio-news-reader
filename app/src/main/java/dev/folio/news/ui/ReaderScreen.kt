@@ -10,6 +10,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -206,7 +209,26 @@ fun ReaderScreen(vm: AppViewModel, article: Article, next: Article?, onNext: (Ar
                 ) {
                     IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = ink) }
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { runCatching { uriHandler.openUri(article.link) } }) { Text("Open \u2197", color = accent, fontSize = 15.sp) }
+                    val saved = vm.isSaved(article)
+                    IconButton(onClick = { vm.quickSave(article) }) {
+                        Icon(Icons.Filled.Star, if (saved) "Remove from magazine" else "Save", tint = if (saved) accent else ink.copy(alpha = 0.55f))
+                    }
+                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                    IconButton(onClick = {
+                        ctx.startActivity(android.content.Intent.createChooser(
+                            android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                                .putExtra(android.content.Intent.EXTRA_SUBJECT, article.title)
+                                .putExtra(android.content.Intent.EXTRA_TEXT, article.title + "\n" + article.link), null))
+                    }) { Icon(Icons.Filled.Share, "Share", tint = ink) }
+                    var menu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More", tint = ink) }
+                        DropdownMenu(menu, { menu = false }) {
+                            DropdownMenuItem(text = { Text("Open in browser") }, onClick = { menu = false; runCatching { uriHandler.openUri(article.link) } })
+                            DropdownMenuItem(text = { Text("Save to magazine\u2026") }, onClick = { menu = false; vm.saveTarget = article })
+                            DropdownMenuItem(text = { Text("Mute ${article.sourceName}") }, onClick = { menu = false; vm.mute(article.sourceName); onClose() })
+                        }
+                    }
                     TextButton(onClick = { vm.updateFontScale((vm.fontScale - 0.1f).coerceAtLeast(0.8f)) }) { Text("A−", color = ink, fontSize = 15.sp) }
                     TextButton(onClick = { vm.updateFontScale((vm.fontScale + 0.1f).coerceAtMost(1.6f)) }) { Text("A+", color = ink, fontSize = 20.sp) }
                     TextButton(onClick = { vm.showSettings = true }) { Text("Aa", color = ink, fontFamily = FontFamily.Serif, fontSize = 18.sp) }

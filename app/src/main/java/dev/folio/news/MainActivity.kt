@@ -71,6 +71,16 @@ class MainActivity : ComponentActivity() {
                         exit = slideOutHorizontally(tween(220)) { it } + fadeOut(),
                     ) { SourcesScreen(vm) }
 
+                    AnimatedVisibility(
+                        visible = vm.showMagazines,
+                        enter = slideInHorizontally(tween(260)) { it } + fadeIn(),
+                        exit = slideOutHorizontally(tween(220)) { it } + fadeOut(),
+                    ) { MagazinesScreen(vm) }
+
+                    vm.saveTarget?.let { SaveToMagazineDialog(vm, it) }
+                    UpdateDialog(vm)
+                    LaunchedEffect(vm.onboarded) { if (vm.onboarded) vm.checkForUpdate() }
+
                     if (vm.showSettings) SettingsSheet(vm)
                     if (vm.showWizard) { OnboardingScreen(vm); BackHandler(vm.onboarded) { vm.showWizard = false } }
 

@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -75,13 +76,20 @@ fun HomeScreen(vm: AppViewModel) {
                 }
             }
         } else {
+            // page 0 is the daily briefing cover, story i lives on page i + 1
+            val brief = vm.briefing()
             FlipPager(
-                count = list.size,
-                initialPage = vm.homeIndex,
-                onSettled = { vm.homeIndex = it; vm.onHomePage(it) },
-                onTap = { list.getOrNull(it)?.let { a -> vm.open(a) } },
+                count = list.size + 1,
+                initialPage = vm.homeIndex + 1,
+                onSettled = { p -> vm.homeIndex = p - 1; if (p > 0) vm.onHomePage(p - 1) },
+                onTap = { p, y ->
+                    if (p == 0) {
+                        val k = (y * BRIEF_WEIGHT - BRIEF_HEAD).toInt()
+                        brief.getOrNull(k)?.let { a -> vm.open(a) }
+                    } else list.getOrNull(p - 1)?.let { a -> vm.open(a) }
+                },
                 modifier = Modifier.fillMaxSize(),
-            ) { i -> StoryPage(list[i], i) }
+            ) { p -> if (p == 0) BriefingPage(brief) else StoryPage(list[p - 1], p - 1) }
         }
 
         // legibility scrim so system icons stay readable over any photo
@@ -122,6 +130,7 @@ private fun SidePanel(vm: AppViewModel, open: Boolean, setOpen: (Boolean) -> Uni
                 }
                 Spacer(Modifier.height(28.dp))
                 PanelItem(Icons.Default.Refresh, if (vm.loading) "Refreshing\u2026" else "Refresh") { vm.refresh(); setOpen(false) }
+                PanelItem(Icons.Default.Favorite, "Magazines") { setOpen(false); vm.showMagazines = true }
                 PanelItem(Icons.AutoMirrored.Filled.List, "Sources") { setOpen(false); vm.showSources = true }
                 PanelItem(Icons.Default.Star, "Interests") { setOpen(false); vm.showWizard = true }
                 PanelItem(Icons.Default.Settings, "Settings") { setOpen(false); vm.showSettings = true }
@@ -257,5 +266,40 @@ private fun TextStory(a: Article, wide: Boolean) {
             Spacer(Modifier.height(20.dp))
             Text(a.summary, color = sub, fontSize = if (wide) 20.sp else 17.sp, lineHeight = if (wide) 30.sp else 26.sp, maxLines = 8, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+private const val BRIEF_HEAD = 1.1f
+private const val BRIEF_WEIGHT = 6.1f   // header weight + five rows
+
+/** Flipboard-style "daily edition" cover: date, greeting and the top stories from different publishers. */
+@Composable
+fun BriefingPage(items: List<Article>) {
+    val onBg = MaterialTheme.colorScheme.onBackground
+    val sub = MaterialTheme.colorScheme.onSurfaceVariant
+    val accent = MaterialTheme.colorScheme.primary
+    val now = remember { java.util.Calendar.getInstance() }
+    val hello = when (now.get(java.util.Calendar.HOUR_OF_DAY)) { in 5..11 -> "Good morning"; in 12..17 -> "Good afternoon"; else -> "Good evening" }
+    val date = remember { java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.getDefault()).format(java.util.Date()) }
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding().padding(horizontal = 28.dp)) {
+        Column(Modifier.weight(BRIEF_HEAD).fillMaxWidth(), verticalArrangement = Arrangement.Bottom) {
+            Text(date.uppercase(), color = accent, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.6.sp)
+            Spacer(Modifier.height(6.dp))
+            Text(hello, color = onBg, fontFamily = Serif, fontWeight = FontWeight.Black, fontSize = 40.sp)
+            Text("Your briefing", color = sub, fontSize = 15.sp)
+            Spacer(Modifier.height(10.dp))
+        }
+        for (i in 0 until 5) {
+            val a = items.getOrNull(i)
+            Row(Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("${i + 1}", color = accent, fontFamily = Serif, fontWeight = FontWeight.Black, fontSize = 28.sp, modifier = Modifier.width(34.dp))
+                if (a != null) Column(Modifier.weight(1f)) {
+                    Text(a.sourceName.uppercase(), color = sub, fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 1.2.sp, maxLines = 1)
+                    Text(a.title, color = onBg, fontFamily = Serif, fontWeight = FontWeight.Bold, fontSize = 17.sp, lineHeight = 22.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (i < 4) HorizontalDivider(color = sub.copy(alpha = 0.18f))
+        }
+        Text("\u2191 Swipe up to flip", color = sub.copy(alpha = 0.7f), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 10.dp))
     }
 }

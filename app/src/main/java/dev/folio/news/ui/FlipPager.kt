@@ -39,7 +39,7 @@ fun FlipPager(
     count: Int,
     initialPage: Int,
     onSettled: (Int) -> Unit,
-    onTap: (Int) -> Unit,
+    onTap: (Int, Float) -> Unit,
     modifier: Modifier = Modifier,
     page: @Composable (Int) -> Unit,
 ) {
@@ -85,7 +85,7 @@ fun FlipPager(
                 },
             )
             .pointerInput(count) {
-                detectTapGestures { if (!progress.isRunning) onTap(progress.value.roundToInt().coerceIn(0, maxIdx)) }
+                detectTapGestures { o -> if (!progress.isRunning) onTap(progress.value.roundToInt().coerceIn(0, maxIdx), (o.y / height).coerceIn(0f, 1f)) }
             }
     ) {
         if (count == 0) return@Box

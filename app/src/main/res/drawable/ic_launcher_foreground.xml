@@ -2,10 +2,15 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- top half of a folded page -->
+    <!-- soft drop shadow under the page -->
+    <path android:fillColor="#33000000"
+        android:pathData="M33,30 H79 V68 L63,84 H33 Z" />
+    <!-- the page, with its lower-right corner folded over -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M34,30 L74,30 L74,53 L34,53 Z" />
-    <!-- lower half, slightly darker, like the flap mid-turn -->
-    <path android:fillColor="#FFD9D5"
-        android:pathData="M34,55 L74,55 L74,78 L34,78 Z" />
+        android:pathData="M31,27 H77 V65 L61,81 H31 Z" />
+    <path android:fillColor="#F1C7C2"
+        android:pathData="M77,65 L61,81 V65 Z" />
+    <!-- serif-style F -->
+    <path android:fillColor="#D8281C"
+        android:pathData="M38,35 H68 V43 H47 V47.5 H61 V54.5 H47 V73 H38 Z" />
 </vector>
