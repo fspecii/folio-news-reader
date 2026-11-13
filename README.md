@@ -120,6 +120,12 @@
 
 ---
 
+### 🆕 New in 1.1
+- **Daily briefing cover** – a Flipboard-style "Good morning" first page with the top 5 stories from different publishers
+- **Magazines** – save stories with the star, or file them into your own collections
+- **Mute publishers**, **share** stories, new adaptive + themed icon
+- **Auto-update from GitHub** – Folio checks the latest release on launch (Settings → Updates) and installs it through the system installer
+
 ## 🧠 The "For You" algorithm
 
 Folio ranks your feed with a small on-device model, so the first page is the one you'd most likely open:

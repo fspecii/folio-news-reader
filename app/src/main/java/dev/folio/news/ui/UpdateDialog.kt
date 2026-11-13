@@ -23,7 +23,7 @@ fun UpdateDialog(vm: AppViewModel) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text("You have ${vm.versionName}.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                if (info.notes.isNotBlank()) { Spacer(Modifier.height(10.dp)); Text(info.notes.take(900), fontSize = 14.sp) }
+                if (info.notes.isNotBlank()) { Spacer(Modifier.height(10.dp)); Text(info.notes.replace("**", "").replace("## ", "").take(900), fontSize = 14.sp) }
                 if (u is UpdateState.Downloading) {
                     Spacer(Modifier.height(16.dp))
                     LinearProgressIndicator(progress = { u.progress }, Modifier.fillMaxWidth())
